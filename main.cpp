@@ -21,7 +21,7 @@ int main(int argc, char **argv)
 
 
         int32_t size = atoi(argv[2]);
-        
+
         try
         {
             fileSystem.Create(size);
@@ -43,6 +43,16 @@ int main(int argc, char **argv)
         {
             std::cout << e;
         }
+    }
+
+    if(!strcmp(argv[1], "-ls"))
+    {
+        fileSystem.ListFiles();
+    }
+
+    if(!strcmp(argv[1], "-lm"))
+    {
+        fileSystem.ListMemory();
     }
 
     return 0;

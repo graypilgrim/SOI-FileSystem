@@ -2,12 +2,14 @@
 
 FileSystem::FileSystem()
 {
-    partition = std::fstream(NAME, std::fstream::in | std::fstream::out | std::ios::binary);
+    partition = std::fstream(NAME, std::fstream::in | std::fstream::out | std::fstream::binary);
+
+    files.reset(new Node[FILES_NO]);
+    bitmap.reset(new bool[size / 128]);
 
     if (partition.good())
     {
         exist = true;
-        ReadSuperblock();
         //tablica semaforow
     }
     else
@@ -15,6 +17,11 @@ FileSystem::FileSystem()
         exist = false;
     }
 
+}
+
+FileSystem::~FileSystem()
+{
+    partition.close();
 }
 
 void FileSystem::Exist() const throw(std::string)
@@ -43,19 +50,16 @@ void FileSystem::Create(uint32_t size)
 
     this->size = size;
 
-    files.reset(new Node[FILES_NO]);
-    bitmap.reset(new bool[size / 128]);
-
     for(int i = 0; i < FILES_NO; ++i)
         files[i].size = 0;
 
-    for(uint i = 0; i < size / 128; ++i)
+    for(uint i = 0; i < (size / 128); ++i)
         bitmap[i] = false;
 
     WriteSuperblock();
     WriteEmptyData();
 
-    partition.close();
+    std::cout << "Partition has been created" << std::endl;
 }
 
 void FileSystem::Destroy()
@@ -104,6 +108,7 @@ void FileSystem::ReadSuperblock()
 
         ss << tempName;
         ss >> files[i].name;
+
     }
 
     int blocksNo = size/BLOCK_SIZE;
@@ -122,4 +127,61 @@ void FileSystem::WriteEmptyData()
     char temp[BLOCK_SIZE] = "";
     for(int i = 0; i < blocksNo; ++i)
         partition.write(reinterpret_cast<const char *>(&temp), sizeof(temp));
+}
+
+void FileSystem::ListFiles()
+{
+    ReadSuperblock();
+
+    std::cout << "Name\t\tSize" << std::endl;
+
+    for(int i = 0; i < FILES_NO; ++i)
+    {
+        if(files[i].size > 0)
+            std::cout << files[i].name << "\t\t\t" << files[i].size << std::endl;
+    }
+}
+
+void FileSystem::ListMemory()
+{
+    ReadSuperblock();
+
+    std::cout << "\n\tSUPERBLOCK:" << std::endl;
+    std::cout << "Partition size\t" << sizeof(size) << "\n" <<
+                 "Nodes table\t" << 10* sizeof(Node) << "\n" <<
+                 "Bitmap\t\t" << (size/BLOCK_SIZE) * sizeof(bool) << std::endl;
+
+    std::cout << "\n\tDATA BLOCKS:" << std::endl;
+
+    uint blocks = size/BLOCK_SIZE;
+    uint cols = 8;
+    uint rows = (blocks % cols > 0) ? (blocks / cols) + 1 : (blocks / cols);
+
+    std::cout << "Block size\t" << BLOCK_SIZE << "\n" <<
+                 "Blocks number\t" << blocks << std::endl;
+
+    std::cout << "\n\tMemory map" << std::endl;
+
+    std::cout << " \t";
+    for(uint i = 0 ; i < cols; ++i)
+        std::cout << i << "  ";
+    std::cout << std::endl;
+
+    for(uint i = 0; i < rows; ++i)
+    {
+        std::cout << i << "\t";
+
+        for(uint j = 0; j < cols; ++j)
+        {
+            if(i*cols + j  >= blocks)
+                break;
+
+            if(bitmap[i*cols + j])
+                std::cout << "#  ";
+            else
+                std::cout << "0  ";
+
+        }
+        std::cout << std::endl;
+    }
 }

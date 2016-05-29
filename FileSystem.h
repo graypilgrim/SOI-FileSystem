@@ -47,6 +47,7 @@ private:
 
 public:
     FileSystem();
+    ~FileSystem();
     uint32_t GetSize() const;
 
     void Create(uint32_t);
