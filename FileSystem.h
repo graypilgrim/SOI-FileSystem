@@ -8,15 +8,17 @@
 #define FILESYSTEM_H
 
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <semaphore.h>
 #include <memory>
 
-#define NAME disk
-#define BLOCK_SIZE 128
-#define FILES_NO
+#define NAME        "disk.fs"
+#define BLOCK_SIZE  128
+#define FILES_NO    10
 
 struct Node
 {
@@ -30,6 +32,7 @@ class FileSystem
 private:
     void ReadSuperblock();
     void WriteSuperblock();
+    void WriteEmptyData();
     void Exist() const throw(std::string);
     void NotExist() const throw(std::string);
     size_t FindFile(std::string &s);
@@ -38,19 +41,19 @@ private:
 
     bool exist;
     uint32_t size;
-    fstream partition;
-    std::unique_ptr<Node[FILES_NO]> files;
+    std::fstream partition;
+    std::unique_ptr<Node[]> files;
     std::unique_ptr<bool[]> bitmap;
 
 public:
     FileSystem();
     uint32_t GetSize() const;
 
-    uint32_t Create(uint32_t);
-    bool Destroy();
-    bool Upload(std::string s);
-    bool Download(std::string s);
-    bool DestroyFile(std::string s);
+    void Create(uint32_t);
+    void Destroy();
+    void Upload(std::string s);
+    void Download(std::string s);
+    void DestroyFile(std::string s);
     void ListFiles();
     void ListMemory();
 

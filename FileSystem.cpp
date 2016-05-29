@@ -2,7 +2,7 @@
 
 FileSystem::FileSystem()
 {
-    parition = std::fstream(NAME);
+    partition = std::fstream(NAME, std::fstream::in | std::fstream::out | std::ios::binary);
 
     if (partition.good())
     {
@@ -17,21 +17,23 @@ FileSystem::FileSystem()
 
 }
 
-void FileSystem::Exist() throw(std::string)
+void FileSystem::Exist() const throw(std::string)
 {
     if (!exist)
-        throw std::string("Partition does not exist!\nUse -create.");
+        throw std::string("Partition does not exist!\nUse -create.\n");
 }
 
-void FileSystem::NotExist() throw(std::string)
+void FileSystem::NotExist() const throw(std::string)
 {
     if (exist)
         throw std::string("Partition already exists!\nEdit or destroy existing partition.\n");
 }
 
-uint32_t FileSystem::Create(uint32_t size)
+void FileSystem::Create(uint32_t size)
 {
     NotExist();
+
+    partition = std::fstream(NAME, std::fstream::out | std::fstream::binary);
 
     if(size < 0)
         throw std::string("Size must not be negative!\n");
@@ -39,65 +41,34 @@ uint32_t FileSystem::Create(uint32_t size)
     while((size % 128) != 0)
         ++size;
 
-    this.size = size;
+    this->size = size;
+
+    files.reset(new Node[FILES_NO]);
+    bitmap.reset(new bool[size / 128]);
 
     for(int i = 0; i < FILES_NO; ++i)
         files[i].size = 0;
 
-    bitmap.reset(new bool[size / 128]);
+    for(uint i = 0; i < size / 128; ++i)
+        bitmap[i] = false;
 
     WriteSuperblock();
     WriteEmptyData();
 
     partition.close();
-
-    return size;
 }
 
-bool FileSystem::Destroy()
+void FileSystem::Destroy()
 {
     Exist();
 
     remove(NAME);
 }
 
-bool FileSystem::Upload(std::string &fileName)
+void FileSystem::WriteSuperblock()
 {
-    std::ifstream file(fileName);
-    if(!file.good())
-        throw std::string("The file does not exist!\n");
-
-    if !possible
-        throw exception;
-
-}
-
-bool FileSystem::Download()
-{
-    FindFile(std::string);
-}
-
-bool FileSystem::DestroyFile()
-{
-    FindFile(std::string);
-}
-
-void ListFiles()
-{
-    for each
-        cout << << << <<
-}
-
-void ListMemory()
-{
-    for each
-        cout << << < << <<
-}
-
-void WriteSuperblock()
-{
-    //ustawic pisanie na poczatek
-    parition.write(reinterpret_cast<const char *>(&size), sizeof(uint32_t));
+    partition.seekp(0, partition.beg);
+    partition.write(reinterpret_cast<const char *>(&size), sizeof(uint32_t));
 
     std::stringstream ss;
     for(int i = 0; i < 10; ++i)
@@ -106,19 +77,21 @@ void WriteSuperblock()
         ss << files[i].name;
         ss >> tempName;
         partition.write(reinterpret_cast<const char *>(&tempName), sizeof(tempName));
-        partition.write(reinterpret_cast<const char *>(&(files[i].size), sizeof(uint32_t)));
-        partition.write(reinterpret_cast<const char *>(&(files[i].dataBegin), sizeof(uint32_t)));
+        partition.write(reinterpret_cast<const char *>(&(files[i].size)), sizeof(uint32_t));
+        partition.write(reinterpret_cast<const char *>(&(files[i].dataBegin)), sizeof(uint32_t));
     }
 
-    for(int i = 0; i < size/BLOCK_SIZE; ++i)
+    int blocksNo = size/BLOCK_SIZE;
+
+    for(int i = 0; i < blocksNo; ++i)
     {
         partition.write(reinterpret_cast<const char *>(&bitmap[i]), sizeof(bool));
     }
 }
 
-void ReadSuperblock()
+void FileSystem::ReadSuperblock()
 {
-    //ustawic czytanie na poczatek
+    partition.seekg(0, partition.beg);
     partition.read(reinterpret_cast<char *>(&size), sizeof(uint32_t));
 
     std::stringstream ss;
@@ -126,16 +99,27 @@ void ReadSuperblock()
     {
         char tempName[16] = "";
         partition.read(reinterpret_cast<char *>(&tempName), sizeof(tempName));
-        partition.read(reinterpret_cast<char *>(&(files[i].size), sizeof(uint32_t)));
-        partition.read(reinterpret_cast<char *>(&(files[i].dataBegin), sizeof(uint32_t)));
+        partition.read(reinterpret_cast<char *>(&(files[i].size)), sizeof(uint32_t));
+        partition.read(reinterpret_cast<char *>(&(files[i].dataBegin)), sizeof(uint32_t));
 
         ss << tempName;
         ss >> files[i].name;
     }
 
-    for(int i = 0; i < size/BLOCK_SIZE; ++i)
+    int blocksNo = size/BLOCK_SIZE;
+
+    for(int i = 0; i < blocksNo; ++i)
     {
         partition.read(reinterpret_cast<char *>(&bitmap[i]), sizeof(bool));
     }
 
+}
+
+void FileSystem::WriteEmptyData()
+{
+    int blocksNo = size/BLOCK_SIZE;
+
+    char temp[BLOCK_SIZE] = "";
+    for(int i = 0; i < blocksNo; ++i)
+        partition.write(reinterpret_cast<const char *>(&temp), sizeof(temp));
 }
