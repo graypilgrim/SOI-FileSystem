@@ -11,7 +11,8 @@ int main(int argc, char **argv)
 
     FileSystem fileSystem;
 
-    if(!strcmp(argv[1], "-create"))
+    //CREATE PARTITION
+    if(!strcmp(argv[1], "-c"))
     {
         if (argc <= 2)
         {
@@ -26,33 +27,86 @@ int main(int argc, char **argv)
         {
             fileSystem.Create(size);
         }
-        catch(std::string e)
+        catch(std::string &e)
         {
             std::cout << e;
         }
 
     }
 
-    if(!strcmp(argv[1], "-destroy"))
+    //DESTROY PARTITION
+    if(!strcmp(argv[1], "-d"))
     {
         try
         {
             fileSystem.Destroy();
         }
-        catch(std::string e)
+        catch(std::string &e)
         {
             std::cout << e;
         }
     }
 
+    //LIST FILES
     if(!strcmp(argv[1], "-ls"))
     {
         fileSystem.ListFiles();
     }
 
+    //LIST MEMORY
     if(!strcmp(argv[1], "-lm"))
     {
         fileSystem.ListMemory();
+    }
+
+    //UPLOAD FILE
+    if(!strcmp(argv[1], "-u"))
+    {
+        if (argc <= 2)
+        {
+            std::cout << "Type name of file to upload" << std::endl;
+            return 0;
+        }
+
+        std::stringstream ss;
+        ss << argv[2];
+        std::string fileName;
+        ss >> fileName;
+
+        try
+        {
+            fileSystem.Upload(fileName);
+        }
+        catch (std::string &e)
+        {
+            std::cout << e;
+        }
+
+    }
+
+    //DELETE FILE
+    if(!strcmp(argv[1], "-rm"))
+    {
+        if (argc <= 2)
+        {
+            std::cout << "Type name of file to delete" << std::endl;
+            return 0;
+        }
+
+        std::stringstream ss;
+        ss << argv[2];
+        std::string fileName;
+        ss >> fileName;
+
+        try
+        {
+            fileSystem.DeleteFile(fileName);
+        }
+        catch (std::string &e)
+        {
+            std::cout << e;
+        }
+
     }
 
     return 0;

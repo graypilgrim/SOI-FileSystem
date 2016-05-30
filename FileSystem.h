@@ -35,15 +35,19 @@ private:
     void WriteEmptyData();
     void Exist() const throw(std::string);
     void NotExist() const throw(std::string);
-    size_t FindFile(std::string &s);
-    uint32_t FindPlace(uint32_t size);
-
+    uint32_t FindPlace(uint32_t fileSize);
+    uint32_t FilesNumber();
+    uint32_t BlocksNumber();
+    uint32_t BlocksNumber(uint32_t fileSize);
+    uint32_t FindFile(std::string &fileName);
+    uint32_t SuperblockSize();
 
     bool exist;
     uint32_t size;
     std::fstream partition;
     std::unique_ptr<Node[]> files;
     std::unique_ptr<bool[]> bitmap;
+
 
 public:
     FileSystem();
@@ -52,9 +56,9 @@ public:
 
     void Create(uint32_t);
     void Destroy();
-    void Upload(std::string s);
-    void Download(std::string s);
-    void DestroyFile(std::string s);
+    void Upload(std::string &fileName);
+    void Download(std::string &s);
+    void DeleteFile(std::string &s);
     void ListFiles();
     void ListMemory();
 
