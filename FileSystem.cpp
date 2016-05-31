@@ -214,7 +214,7 @@ void FileSystem::Upload(std::string &fileName)
         throw e;
     }
 
-    uint32_t firstUnoccupied = 0;
+    uint32_t index = 0;
 
     for(uint i = 0; i < FILES_NO; ++i)
     {
@@ -222,15 +222,15 @@ void FileSystem::Upload(std::string &fileName)
             throw std::string("File name must be unique!\n");
 
         if(files[i].size > 0)
-            ++firstUnoccupied;
+            ++index;
     }
 
-    if(firstUnoccupied == FILES_NO)
+    if(index == FILES_NO)
         throw std::string ("The maximum number of files has been reached. Delete some file to upload new\n");
 
-    files[firstUnoccupied].name = fileName;
-    files[firstUnoccupied].size = newFileSize;
-    files[firstUnoccupied].dataBegin = dataBegin;
+    files[index].name = fileName;
+    files[index].size = newFileSize;
+    files[index].dataBegin = dataBegin;
 
 
     char temp[BLOCK_SIZE];
@@ -334,4 +334,33 @@ uint32_t FileSystem::FindFile(std::string &fileName)
     }
 
     throw std::string("There is no file with this name!\n");
+}
+
+void FileSystem::Download(std::string &fileName)
+{
+    ReadSuperblock();
+
+    uint32_t index;
+
+    try
+    {
+        index = FindFile(fileName);
+    }
+    catch (std::string &e)
+    {
+        throw e;
+    }
+
+    std::fstream file(fileName, std::fstream::out | std::fstream::binary);
+
+    char *temp = new char[files[index].size];
+
+    uint32_t begin = files[index].dataBegin;
+
+    partition.seekp(SuperblockSize() + BLOCK_SIZE*begin, partition.beg);
+
+    partition.read(reinterpret_cast<char *>(&temp), sizeof(temp));
+    file.write(reinterpret_cast<const char *>(&temp), sizeof(temp));
+
+    file.close();
 }

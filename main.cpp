@@ -12,7 +12,7 @@ int main(int argc, char **argv)
     FileSystem fileSystem;
 
     //CREATE PARTITION
-    if(!strcmp(argv[1], "-c"))
+    if(!strcmp(argv[1], "-create"))
     {
         if (argc <= 2)
         {
@@ -35,7 +35,7 @@ int main(int argc, char **argv)
     }
 
     //DESTROY PARTITION
-    if(!strcmp(argv[1], "-d"))
+    if(!strcmp(argv[1], "-destroy"))
     {
         try
         {
@@ -101,6 +101,30 @@ int main(int argc, char **argv)
         try
         {
             fileSystem.DeleteFile(fileName);
+        }
+        catch (std::string &e)
+        {
+            std::cout << e;
+        }
+
+    }
+
+    if(!strcmp(argv[1], "-d"))
+    {
+        if (argc <= 2)
+        {
+            std::cout << "Type name of file to download" << std::endl;
+            return 0;
+        }
+
+        std::stringstream ss;
+        ss << argv[2];
+        std::string fileName;
+        ss >> fileName;
+
+        try
+        {
+            fileSystem.Download(fileName);
         }
         catch (std::string &e)
         {
