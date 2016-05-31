@@ -325,6 +325,8 @@ void FileSystem::DeleteFile(std::string &fileName)
 
     uint32_t index = FindFile(fileName);
 
+    SemDown(semId, index);
+
     uint32_t begin = files[index].dataBegin;
     uint32_t end = files[index].dataBegin + BlocksNumber(files[index].size);
 
@@ -336,6 +338,8 @@ void FileSystem::DeleteFile(std::string &fileName)
     files[index].dataBegin = 0;
 
     WriteSuperblock();
+
+    SemUp(semId, index);
 }
 
 uint32_t FileSystem::FindFile(std::string &fileName)
@@ -366,6 +370,8 @@ void FileSystem::Download(std::string &fileName)
         throw e;
     }
 
+    SemDown(semId, index);
+
     std::fstream file(fileName, std::fstream::out | std::fstream::binary);
 
     char *temp = new char[files[index].size];
@@ -378,14 +384,38 @@ void FileSystem::Download(std::string &fileName)
     file.write(reinterpret_cast<const char *>(&temp), sizeof(temp));
 
     file.close();
+
+    SemUp(semId, index);
 }
 
 void FileSystem::ReadFile(std::string &fileName)
 {
     ReadSuperblock();
 
-    FindFile(fileName);
+    uint32_t index = FindFile(fileName);
 
-    while(1)
-    {}
+    SemDown(semId, index);
+    sleep(20);
+    SemUp(semId, index);
+
+}
+
+int FileSystem::SemUp(uint32_t semId, uint32_t semNum)
+{
+    struct sembuf buf;
+    buf.sem_num = semNum;
+    buf.sem_op = 1;
+    buf.sem_flg = 0;
+
+    return semop(semId, &buf, 1);
+}
+
+int FileSystem::SemDown(uint32_t semId, uint32_t semNum)
+{
+    struct sembuf buf;
+    buf.sem_num = semNum;
+    buf.sem_op = -1;
+    buf.sem_flg = 0;
+
+    return semop(semId, &buf, 1);
 }

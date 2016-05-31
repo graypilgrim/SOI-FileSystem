@@ -16,6 +16,7 @@
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/sem.h>
+#include <unistd.h>
 
 #define NAME        "disk.fs"
 #define BLOCK_SIZE  128
@@ -43,6 +44,8 @@ private:
     uint32_t BlocksNumber(uint32_t fileSize);
     uint32_t FindFile(std::string &fileName);
     uint32_t SuperblockSize();
+    int SemUp(uint32_t semId, uint32_t semNum);
+    int SemDown(uint32_t semId, uint32_t semNum);
 
     bool exist;
     uint32_t size;
