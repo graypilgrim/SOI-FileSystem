@@ -11,7 +11,7 @@ FileSystem::FileSystem()
     {
         exist = true;
         partition.read(reinterpret_cast<char *>(&size), sizeof(uint32_t));
-        //tablica semaforow
+
     }
     else
     {
@@ -23,6 +23,8 @@ FileSystem::FileSystem()
 FileSystem::~FileSystem()
 {
     partition.close();
+
+    semctl(semId, (int)0, IPC_RMID, (int)0);
 }
 
 void FileSystem::Exist() const throw(std::string)
@@ -96,6 +98,17 @@ void FileSystem::WriteSuperblock()
 
 void FileSystem::ReadSuperblock()
 {
+    bool init = true;
+
+    semId = semget(SEM_ARRAY, FILES_NO, IPC_CREAT|IPC_EXCL|0600);
+    if (semId == -1){
+        semId = semget(SEM_ARRAY, FILES_NO, 0600);
+        init = false;
+        if (semId == -1){
+            throw std::string("Can't create semaphores array\n");
+        }
+    }
+
     partition.seekg(0, partition.beg);
     partition.read(reinterpret_cast<char *>(&size), sizeof(uint32_t));
 
@@ -110,6 +123,8 @@ void FileSystem::ReadSuperblock()
         ss << tempName;
         ss >> files[i].name;
 
+        if(init)
+            semctl(semId, i, SETVAL,(int)1);
     }
 
     int blocksNo = size/BLOCK_SIZE;
@@ -363,4 +378,14 @@ void FileSystem::Download(std::string &fileName)
     file.write(reinterpret_cast<const char *>(&temp), sizeof(temp));
 
     file.close();
+}
+
+void FileSystem::ReadFile(std::string &fileName)
+{
+    ReadSuperblock();
+
+    FindFile(fileName);
+
+    while(1)
+    {}
 }

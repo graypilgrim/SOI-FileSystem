@@ -30,6 +30,7 @@ int main(int argc, char **argv)
         catch(std::string &e)
         {
             std::cout << e;
+            fileSystem.~FileSystem();
         }
 
     }
@@ -44,6 +45,7 @@ int main(int argc, char **argv)
         catch(std::string &e)
         {
             std::cout << e;
+            fileSystem.~FileSystem();
         }
     }
 
@@ -80,6 +82,7 @@ int main(int argc, char **argv)
         catch (std::string &e)
         {
             std::cout << e;
+            fileSystem.~FileSystem();
         }
 
     }
@@ -105,6 +108,7 @@ int main(int argc, char **argv)
         catch (std::string &e)
         {
             std::cout << e;
+            fileSystem.~FileSystem();
         }
 
     }
@@ -129,6 +133,32 @@ int main(int argc, char **argv)
         catch (std::string &e)
         {
             std::cout << e;
+            fileSystem.~FileSystem();
+        }
+
+    }
+
+    if(!strcmp(argv[1], "-read"))
+    {
+        if (argc <= 2)
+        {
+            std::cout << "Type name of file to read" << std::endl;
+            return 0;
+        }
+
+        std::stringstream ss;
+        ss << argv[2];
+        std::string fileName;
+        ss >> fileName;
+
+        try
+        {
+            fileSystem.ReadFile(fileName);
+        }
+        catch (std::string &e)
+        {
+            std::cout << e;
+            fileSystem.~FileSystem();
         }
 
     }

@@ -11,14 +11,16 @@
 #include <fstream>
 #include <sstream>
 #include <stdio.h>
-#include <sys/types.h>
 #include <sys/stat.h>
-#include <semaphore.h>
 #include <memory>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
 
 #define NAME        "disk.fs"
 #define BLOCK_SIZE  128
 #define FILES_NO    10
+#define SEM_ARRAY   5861524
 
 struct Node
 {
@@ -47,6 +49,7 @@ private:
     std::fstream partition;
     std::unique_ptr<Node[]> files;
     std::unique_ptr<bool[]> bitmap;
+    int32_t semId;
 
 
 public:
@@ -61,6 +64,7 @@ public:
     void DeleteFile(std::string &s);
     void ListFiles();
     void ListMemory();
+    void ReadFile(std::string &fileName);
 
 };
 
