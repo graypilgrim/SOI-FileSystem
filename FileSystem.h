@@ -17,6 +17,7 @@
 #include <sys/ipc.h>
 #include <sys/sem.h>
 #include <unistd.h>
+#include <list>
 
 #define NAME        "disk.fs"
 #define BLOCK_SIZE  128
@@ -39,18 +40,18 @@ private:
     void Exist() const throw(std::string);
     void NotExist() const throw(std::string);
     uint32_t FindPlace(uint32_t fileSize);
-    uint32_t FilesNumber();
     uint32_t BlocksNumber();
     uint32_t BlocksNumber(uint32_t fileSize);
-    uint32_t FindFile(std::string &fileName);
+    std::list<Node>::iterator FindFile(std::string &fileName);
     uint32_t SuperblockSize();
     int SemUp(uint32_t semId, uint32_t semNum);
     int SemDown(uint32_t semId, uint32_t semNum);
 
     bool exist;
     uint32_t size;
+    uint32_t filesNo;
     std::fstream partition;
-    std::unique_ptr<Node[]> files;
+    std::list<Node> files;
     std::unique_ptr<bool[]> bitmap;
     int32_t semId;
 

@@ -4,14 +4,13 @@ FileSystem::FileSystem()
 {
     partition = std::fstream(NAME, std::fstream::in | std::fstream::out | std::fstream::binary);
 
-    files.reset(new Node[FILES_NO]);
     bitmap.reset(new bool[size / 128]);
 
     if (partition.good())
     {
         exist = true;
-        partition.read(reinterpret_cast<char *>(&size), sizeof(uint32_t));
-
+        //partition.read(reinterpret_cast<char *>(&size), sizeof(uint32_t));
+        //partition.read(reinterpret_cast<char *>(&filesNo), sizeof(uint32_t));
     }
     else
     {
@@ -23,8 +22,9 @@ FileSystem::FileSystem()
 FileSystem::~FileSystem()
 {
     partition.close();
+    files.clear();
 
-    semctl(semId, (int)0, IPC_RMID, (int)0);
+//    semctl(semId, (int)0, IPC_RMID, (int)0);
 }
 
 void FileSystem::Exist() const throw(std::string)
@@ -53,8 +53,7 @@ void FileSystem::Create(uint32_t size)
 
     this->size = size;
 
-    for(int i = 0; i < FILES_NO; ++i)
-        files[i].size = 0;
+    this->filesNo = 0;
 
     for(uint i = 0; i < (size / 128); ++i)
         bitmap[i] = false;
@@ -76,16 +75,17 @@ void FileSystem::WriteSuperblock()
 {
     partition.seekp(0, partition.beg);
     partition.write(reinterpret_cast<const char *>(&size), sizeof(uint32_t));
+    partition.write(reinterpret_cast<const char *>(&filesNo), sizeof(uint32_t));
 
-    for(int i = 0; i < 10; ++i)
+    for(auto it : files)
     {
         std::stringstream ss;
         char tempName[16] = "";
-        ss << files[i].name;
+        ss << it.name;
         ss >> tempName;
         partition.write(reinterpret_cast<const char *>(&tempName), sizeof(tempName));
-        partition.write(reinterpret_cast<const char *>(&(files[i].size)), sizeof(uint32_t));
-        partition.write(reinterpret_cast<const char *>(&(files[i].dataBegin)), sizeof(uint32_t));
+        partition.write(reinterpret_cast<const char *>(&(it.size)), sizeof(uint32_t));
+        partition.write(reinterpret_cast<const char *>(&(it.dataBegin)), sizeof(uint32_t));
     }
 
     int blocksNo = size/BLOCK_SIZE;
@@ -99,7 +99,7 @@ void FileSystem::WriteSuperblock()
 void FileSystem::ReadSuperblock()
 {
     bool init = true;
-
+/*
     semId = semget(SEM_ARRAY, FILES_NO, IPC_CREAT|IPC_EXCL|0600);
     if (semId == -1){
         semId = semget(SEM_ARRAY, FILES_NO, 0600);
@@ -108,20 +108,24 @@ void FileSystem::ReadSuperblock()
             throw std::string("Can't create semaphores array\n");
         }
     }
-
+*/
     partition.seekg(0, partition.beg);
     partition.read(reinterpret_cast<char *>(&size), sizeof(uint32_t));
+    partition.read(reinterpret_cast<char *>(&filesNo), sizeof(uint32_t));
 
-    for(int i = 0; i < 10; ++i)
+    for(uint i = 0; i < filesNo; ++i)
     {
+        Node node;
         std::stringstream ss;
         char tempName[16] = "";
         partition.read(reinterpret_cast<char *>(&tempName), sizeof(tempName));
-        partition.read(reinterpret_cast<char *>(&(files[i].size)), sizeof(uint32_t));
-        partition.read(reinterpret_cast<char *>(&(files[i].dataBegin)), sizeof(uint32_t));
+        partition.read(reinterpret_cast<char *>(&(node.size)), sizeof(uint32_t));
+        partition.read(reinterpret_cast<char *>(&(node.dataBegin)), sizeof(uint32_t));
 
         ss << tempName;
-        ss >> files[i].name;
+        ss >> node.name;
+
+        files.push_back(node);
 
         if(init)
             semctl(semId, i, SETVAL,(int)1);
@@ -151,10 +155,9 @@ void FileSystem::ListFiles()
 
     std::cout << "Name\t\tSize" << std::endl;
 
-    for(int i = 0; i < FILES_NO; ++i)
+    for(auto node : files)
     {
-        if(files[i].size > 0)
-            std::cout << files[i].name << "\t" << files[i].size << std::endl;
+        std::cout << node.name << "\t" << node.size << std::endl;
     }
 }
 
@@ -229,24 +232,22 @@ void FileSystem::Upload(std::string &fileName)
         throw e;
     }
 
-    uint32_t index = 0;
-
-    for(uint i = 0; i < FILES_NO; ++i)
+    for(auto node : files)
     {
-        if(files[i].name == fileName)
+        if(node.name == fileName)
             throw std::string("File name must be unique!\n");
 
-        if(files[i].size > 0)
-            ++index;
     }
 
-    if(index == FILES_NO)
-        throw std::string ("The maximum number of files has been reached. Delete some file to upload new\n");
+    Node node;
 
-    files[index].name = fileName;
-    files[index].size = newFileSize;
-    files[index].dataBegin = dataBegin;
 
+    node.name = fileName;
+    node.size = newFileSize;
+    node.dataBegin = dataBegin;
+
+    files.push_back(node);
+    ++filesNo;
 
     char temp[BLOCK_SIZE];
 
@@ -306,50 +307,34 @@ uint32_t FileSystem::SuperblockSize()
     return sizeof(size) + 10* sizeof(Node) + (size/BLOCK_SIZE) * sizeof(bool);
 }
 
-uint32_t FileSystem::FilesNumber()
-{
-    uint32_t counter = 0;
-
-    for(uint i = 0; i < FILES_NO; ++i)
-    {
-        if(files[i].size > 0)
-            ++counter;
-    }
-
-    return counter;
-}
-
 void FileSystem::DeleteFile(std::string &fileName)
 {
     ReadSuperblock();
 
-    uint32_t index = FindFile(fileName);
+    std::list<Node>::iterator it = FindFile(fileName);
 
-    SemDown(semId, index);
+    //SemDown(semId, index);
 
-    uint32_t begin = files[index].dataBegin;
-    uint32_t end = files[index].dataBegin + BlocksNumber(files[index].size);
+    uint32_t begin = it->dataBegin;
+    uint32_t end = it->dataBegin + BlocksNumber(it->size);
 
     for(uint i = begin; i < end; ++i)
         bitmap[i] = false;
 
-    files[index].name = std::string();
-    files[index].size = 0;
-    files[index].dataBegin = 0;
+    files.erase(it);
+    --filesNo;
 
     WriteSuperblock();
 
-    SemUp(semId, index);
+    //SemUp(semId, index);
 }
 
-uint32_t FileSystem::FindFile(std::string &fileName)
+std::list<Node>::iterator FileSystem::FindFile(std::string &fileName)
 {
-    for(uint i = 0; i < FILES_NO; ++i)
+    for(auto it = files.begin(); it != files.end(); ++it)
     {
-        if(files[i].name == fileName)
-        {
-            return i;
-        }
+        if(it->name == fileName)
+            return it;
     }
 
     throw std::string("There is no file with this name!\n");
@@ -359,24 +344,24 @@ void FileSystem::Download(std::string &fileName)
 {
     ReadSuperblock();
 
-    uint32_t index;
+    std::list<Node>::iterator it;
 
     try
     {
-        index = FindFile(fileName);
+        it = FindFile(fileName);
     }
     catch (std::string &e)
     {
         throw e;
     }
 
-    SemDown(semId, index);
+    //SemDown(semId, index);
 
     std::fstream file(fileName, std::fstream::out | std::fstream::binary);
 
-    char *temp = new char[files[index].size];
+    char *temp = new char[it->size];
 
-    uint32_t begin = files[index].dataBegin;
+    uint32_t begin = it->dataBegin;
 
     partition.seekp(SuperblockSize() + BLOCK_SIZE*begin, partition.beg);
 
@@ -385,18 +370,18 @@ void FileSystem::Download(std::string &fileName)
 
     file.close();
 
-    SemUp(semId, index);
+    //SemUp(semId, index);
 }
 
 void FileSystem::ReadFile(std::string &fileName)
 {
     ReadSuperblock();
 
-    uint32_t index = FindFile(fileName);
+    std::list<Node>::iterator it = FindFile(fileName);
 
-    SemDown(semId, index);
-    sleep(20);
-    SemUp(semId, index);
+    //SemDown(semId, index);
+    //sleep(20);
+    //SemUp(semId, index);
 
 }
 
