@@ -18,11 +18,12 @@
 #include <sys/sem.h>
 #include <unistd.h>
 #include <list>
+#include <vector>
 
 #define NAME        "disk.fs"
 #define BLOCK_SIZE  128
-#define FILES_NO    10
-#define SEM_ARRAY   5861524
+#define MUTEX       0
+#define COUNTER     1
 
 struct Node
 {
@@ -46,6 +47,7 @@ private:
     uint32_t SuperblockSize();
     int SemUp(uint32_t semId, uint32_t semNum);
     int SemDown(uint32_t semId, uint32_t semNum);
+    int CreateSemaphore(std::string &fileName);
 
     bool exist;
     uint32_t size;
@@ -53,7 +55,7 @@ private:
     std::fstream partition;
     std::list<Node> files;
     std::unique_ptr<bool[]> bitmap;
-    int32_t semId;
+    std::vector<int32_t> semaphores;
 
 
 public:

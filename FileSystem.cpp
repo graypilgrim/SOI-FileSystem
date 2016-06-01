@@ -9,8 +9,6 @@ FileSystem::FileSystem()
     if (partition.good())
     {
         exist = true;
-        //partition.read(reinterpret_cast<char *>(&size), sizeof(uint32_t));
-        //partition.read(reinterpret_cast<char *>(&filesNo), sizeof(uint32_t));
     }
     else
     {
@@ -24,7 +22,8 @@ FileSystem::~FileSystem()
     partition.close();
     files.clear();
 
-//    semctl(semId, (int)0, IPC_RMID, (int)0);
+    for(auto id : semaphores)
+        semctl(id, (int)0, IPC_RMID, (int)0);
 }
 
 void FileSystem::Exist() const throw(std::string)
@@ -98,17 +97,6 @@ void FileSystem::WriteSuperblock()
 
 void FileSystem::ReadSuperblock()
 {
-    bool init = true;
-/*
-    semId = semget(SEM_ARRAY, FILES_NO, IPC_CREAT|IPC_EXCL|0600);
-    if (semId == -1){
-        semId = semget(SEM_ARRAY, FILES_NO, 0600);
-        init = false;
-        if (semId == -1){
-            throw std::string("Can't create semaphores array\n");
-        }
-    }
-*/
     partition.seekg(0, partition.beg);
     partition.read(reinterpret_cast<char *>(&size), sizeof(uint32_t));
     partition.read(reinterpret_cast<char *>(&filesNo), sizeof(uint32_t));
@@ -126,17 +114,12 @@ void FileSystem::ReadSuperblock()
         ss >> node.name;
 
         files.push_back(node);
-
-        if(init)
-            semctl(semId, i, SETVAL,(int)1);
     }
 
     int blocksNo = size/BLOCK_SIZE;
 
     for(int i = 0; i < blocksNo; ++i)
-    {
         partition.read(reinterpret_cast<char *>(&bitmap[i]), sizeof(bool));
-    }
 
 }
 
@@ -209,7 +192,6 @@ void FileSystem::Upload(std::string &fileName)
 {
     ReadSuperblock();
 
-
     std::fstream newFile(fileName, std::fstream::in | std::fstream::out |std::fstream::binary);
 
     if(!newFile.good())
@@ -240,7 +222,6 @@ void FileSystem::Upload(std::string &fileName)
     }
 
     Node node;
-
 
     node.name = fileName;
     node.size = newFileSize;
@@ -313,7 +294,9 @@ void FileSystem::DeleteFile(std::string &fileName)
 
     std::list<Node>::iterator it = FindFile(fileName);
 
-    //SemDown(semId, index);
+    uint32_t semId = CreateSemaphore(fileName);
+
+    SemDown(semId, MUTEX);
 
     uint32_t begin = it->dataBegin;
     uint32_t end = it->dataBegin + BlocksNumber(it->size);
@@ -326,7 +309,7 @@ void FileSystem::DeleteFile(std::string &fileName)
 
     WriteSuperblock();
 
-    //SemUp(semId, index);
+    SemUp(semId, MUTEX);
 }
 
 std::list<Node>::iterator FileSystem::FindFile(std::string &fileName)
@@ -344,6 +327,15 @@ void FileSystem::Download(std::string &fileName)
 {
     ReadSuperblock();
 
+    int semId = CreateSemaphore(fileName);
+
+    if(semctl(semId, COUNTER, GETVAL, 0) == 0)
+    {
+        SemDown(semId, MUTEX);
+    }
+
+    SemUp(semId, COUNTER);
+
     std::list<Node>::iterator it;
 
     try
@@ -354,8 +346,6 @@ void FileSystem::Download(std::string &fileName)
     {
         throw e;
     }
-
-    //SemDown(semId, index);
 
     std::fstream file(fileName, std::fstream::out | std::fstream::binary);
 
@@ -370,18 +360,35 @@ void FileSystem::Download(std::string &fileName)
 
     file.close();
 
-    //SemUp(semId, index);
+    SemDown(semId, COUNTER);
+
+    if(semctl(semId, COUNTER, GETVAL) == 0)
+        SemUp(semId, MUTEX);
 }
 
 void FileSystem::ReadFile(std::string &fileName)
 {
     ReadSuperblock();
 
+    int semId = CreateSemaphore(fileName);
+
+    std::cout << semctl(semId, COUNTER, GETVAL, 0) << std::endl;
+
+    if(semctl(semId, COUNTER, GETVAL, 0) == 0)
+    {
+        SemDown(semId, MUTEX);
+    }
+
+    SemUp(semId, COUNTER);
+
     std::list<Node>::iterator it = FindFile(fileName);
 
-    //SemDown(semId, index);
-    //sleep(20);
-    //SemUp(semId, index);
+    sleep(20);
+
+    SemDown(semId, COUNTER);
+
+    if(semctl(semId, COUNTER, GETVAL) == 0)
+        SemUp(semId, MUTEX);
 
 }
 
@@ -403,4 +410,31 @@ int FileSystem::SemDown(uint32_t semId, uint32_t semNum)
     buf.sem_flg = 0;
 
     return semop(semId, &buf, 1);
+}
+
+int FileSystem::CreateSemaphore(std::string &fileName)
+{
+    uint32_t hash = 0;
+    bool init = false;
+
+    for(uint i = 0; i < fileName.size(); ++i)
+        hash += fileName[i];
+
+    int tempId = semget(hash, 2, IPC_CREAT|IPC_EXCL|0600);
+    if (tempId == -1)
+    {
+        tempId = semget(hash, 2, 0600);
+        init = true;
+
+        if (tempId == -1)
+            throw std::string("Can't create semaphores array\n");
+    }
+
+    if(!init)
+    {
+        SemUp(tempId, MUTEX);
+        semaphores.push_back(tempId);
+    }
+
+    return tempId;
 }
