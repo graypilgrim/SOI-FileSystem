@@ -8,7 +8,7 @@ SOURCES = \
 
 OBJECTS=$(SOURCES:.cpp=.o)
 
-main: $(OBJECTS)
+fs: $(OBJECTS)
 	$(CXX) -o $@ $^ $(LINKFLAGS)
 
 %.o : %.cpp
@@ -16,7 +16,7 @@ main: $(OBJECTS)
 
 clean:
 	rm -f *.o
-	rm main
+	rm fs
 
 .PHONY:
 	clean

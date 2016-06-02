@@ -52,13 +52,27 @@ int main(int argc, char **argv)
     //LIST FILES
     if(!strcmp(argv[1], "-ls"))
     {
-        fileSystem.ListFiles();
+        try
+        {
+            fileSystem.ListFiles();
+        }
+        catch (std::string e)
+        {
+            std::cout << e;
+        }
     }
 
     //LIST MEMORY
     if(!strcmp(argv[1], "-lm"))
     {
-        fileSystem.ListMemory();
+        try
+        {
+            fileSystem.ListMemory();
+        }
+        catch (std::string e)
+        {
+            std::cout << e;
+        }
     }
 
     //UPLOAD FILE
