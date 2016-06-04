@@ -23,10 +23,10 @@
 
 #define NAME        "disk.fs"
 #define FILES_NO    30
+#define FILEACCESS  0
 #define BLOCK_SIZE  128
-#define MUTEX       0
-#define ACCESS      1
-#define COUNTER     2
+#define ID          5861524
+
 
 struct Node
 {
@@ -64,14 +64,13 @@ private:
     int32_t FindFile(std::string &fileName) throw (std::string);
     int SemUp(uint32_t semId, uint32_t semNum);
     int SemDown(uint32_t semId, uint32_t semNum);
-    int CreateSemaphore(std::string &fileName) throw (std::string);
 
     bool exist;
     uint32_t size;
+    int32_t semId;
     std::fstream partition;
     std::unique_ptr<Node[]> files;
     std::unique_ptr<bool[]> bitmap;
-    std::vector<int32_t> semaphores;
 };
 
 #endif

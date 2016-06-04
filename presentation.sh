@@ -13,6 +13,7 @@ do
 done
 
 set -x
+./fs -destroy
 ./fs -ls
 
 ./fs -create 10000
@@ -28,6 +29,10 @@ do
     ./fs -lm
 done
 
+
+find ./ -name 'small_*' -exec rm {} \;
+find ./ -name 'big_*' -exec rm {} \;
+
 ./fs -rm big_3.cpp
 ./fs -ls
 ./fs -lm
@@ -38,5 +43,20 @@ done
 ./fs -u small_1.cpp
 
 ./fs -rm big_2.cpp &
+./fs -d big_2.cpp &
+./fs -d big_4.cpp &
 ./fs -read big_2.cpp &
 ./fs -read big_2.cpp &
+./fs -d small_2.cpp
+./fs -ls
+
+g++ big_2.cpp -o test_file
+
+./fs -destroy
+set +x
+
+./test_file
+
+rm test_file
+find ./ -name 'small_*' -exec rm {} \;
+find ./ -name 'big_*' -exec rm {} \;
