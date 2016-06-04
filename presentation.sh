@@ -35,14 +35,8 @@ done
 ./fs -rm small_6.cpp
 ./fs -ls
 ./fs -lm
-
 ./fs -u small_1.cpp
 
-
-
-
-./fs -destroy
-set +x
-
-find ./ -name 'small_*' -exec rm {} \;
-find ./ -name 'big_*' -exec rm {} \;
+./fs -rm big_2.cpp &
+./fs -read big_2.cpp &
+./fs -read big_2.cpp &

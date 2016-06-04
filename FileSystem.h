@@ -25,7 +25,8 @@
 #define FILES_NO    30
 #define BLOCK_SIZE  128
 #define MUTEX       0
-#define COUNTER     1
+#define ACCESS      1
+#define COUNTER     2
 
 struct Node
 {

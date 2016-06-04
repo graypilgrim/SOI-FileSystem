@@ -19,10 +19,17 @@ FileSystem::~FileSystem()
 {
 
     partition.close();
-
+/*
     for(auto id : semaphores)
-        semctl(id, (int)0, IPC_RMID, (int)0);
-
+    {
+        std::cout << "checking" << std::endl;
+        SemDown(id, MUTEX);
+        std::cout << "in" << std::endl;
+        if(semctl(id, ACCESS, GETVAL, 0) >= 0)
+            semctl(id, 0, IPC_RMID, 0);
+        SemUp(id, MUTEX);
+    }
+*/
 }
 
 void FileSystem::Create(uint32_t size) throw (std::string)
@@ -126,7 +133,10 @@ void FileSystem::Download(std::string &fileName) throw (std::string)
 
     if(semctl(semId, COUNTER, GETVAL, 0) == 0)
     {
-        SemDown(semId, MUTEX);
+        if(semctl(semId, MUTEX, GETVAL, 0) == 0)
+            throw std::string("Can't get access to the file\n");
+        else
+            SemDown(semId, MUTEX);
     }
 
     SemUp(semId, COUNTER);
@@ -156,12 +166,21 @@ void FileSystem::DeleteFile(std::string &fileName) throw (std::string)
 {
     Exist();
     ReadSuperblock();
-
-
     int32_t index = FindFile(fileName);
+
     uint32_t semId = CreateSemaphore(fileName);
 
     SemDown(semId, MUTEX);
+    if(semctl(semId, ACCESS, GETVAL, 0) == 0)
+    {
+        SemUp(semId, MUTEX);
+        SemDown(semId, ACCESS);
+    }
+    else
+    {
+        SemDown(semId, ACCESS);
+        SemUp(semId, MUTEX);
+    }
 
     uint32_t begin = files[index].dataBegin;
     uint32_t end = begin + BlocksNumber(files[index].size);
@@ -174,7 +193,9 @@ void FileSystem::DeleteFile(std::string &fileName) throw (std::string)
 
     WriteSuperblock();
 
-    SemUp(semId, MUTEX);
+    sleep(1);
+    std::cout << "File: " << fileName << " removed" << std::endl;
+    SemUp(semId, ACCESS);
 }
 
 void FileSystem::ListFiles() throw (std::string)
@@ -240,25 +261,46 @@ void FileSystem::ReadFile(std::string &fileName) throw (std::string)
 {
     Exist();
     ReadSuperblock();
+    FindFile(fileName);
 
     int semId = CreateSemaphore(fileName);
 
-    std::cout << semctl(semId, COUNTER, GETVAL, 0) << std::endl;
-
+    SemDown(semId, MUTEX);
     if(semctl(semId, COUNTER, GETVAL, 0) == 0)
-        SemDown(semId, MUTEX);
+    {
+        if(semctl(semId, ACCESS, GETVAL, 0) == 1)
+        {
+            SemDown(semId, ACCESS);
+            SemUp(semId, MUTEX);
+        }
+        else
+        {
+            SemUp(semId, MUTEX);
+            SemDown(semId, ACCESS);
+        }
+    }
 
     SemUp(semId, COUNTER);
 
-    int32_t index = FindFile(fileName);
-    std::cout << "Reading the file: " << files[index].name << "..." << std::endl;
-    sleep(20);
+    ReadSuperblock();
+    try
+    {
+        FindFile(fileName);
+    }
+    catch (std::string e)
+    {
+        SemUp(semId, ACCESS);
+        throw e;
+    }
 
+    std::cout << "Reading the file: " << fileName << std::endl;
+    sleep(1);
+
+    SemDown(semId, MUTEX);
     SemDown(semId, COUNTER);
-
-    if(semctl(semId, COUNTER, GETVAL) == 0)
-        SemUp(semId, MUTEX);
-
+    if(semctl(semId, COUNTER, GETVAL, 0) == 0)
+        SemUp(semId, ACCESS);
+    SemUp(semId, MUTEX);
 }
 
 void FileSystem::Exist() throw(std::string)
@@ -390,7 +432,7 @@ int FileSystem::CreateSemaphore(std::string &fileName) throw (std::string)
     for(uint i = 0; i < fileName.size(); ++i)
         hash += fileName[i];
 
-    int tempId = semget(hash, 2, IPC_CREAT|IPC_EXCL|0600);
+    int tempId = semget(hash, 3, IPC_CREAT|IPC_EXCL|0600);
     if (tempId == -1)
     {
         tempId = semget(hash, 2, 0600);
@@ -402,10 +444,11 @@ int FileSystem::CreateSemaphore(std::string &fileName) throw (std::string)
 
     if(!init)
     {
+        SemUp(tempId, ACCESS);
         SemUp(tempId, MUTEX);
-        semaphores.push_back(tempId);
     }
 
+    semaphores.push_back(tempId);
     return tempId;
 }
 
