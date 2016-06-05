@@ -50,7 +50,7 @@ find ./ -name 'big_*' -exec rm {} \;
 ./fs -d small_2.cpp
 ./fs -ls
 
-g++ big_2.cpp -o test_file
+g++ big_4.cpp -o test_file
 
 ./fs -destroy
 set +x
