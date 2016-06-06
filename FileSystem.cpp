@@ -65,6 +65,7 @@ void FileSystem::Create(uint32_t size) throw (std::string)
 void FileSystem::Destroy() throw (std::string)
 {
     Exist();
+    SemDown(ID, FILEACCESS);
     ReadSuperblock();
 
     semctl(semId, 0, IPC_RMID, 0);
@@ -74,6 +75,7 @@ void FileSystem::Destroy() throw (std::string)
 void FileSystem::Upload(std::string &fileName) throw (std::string)
 {
     Exist();
+    SemDown(ID, FILEACCESS);
     ReadSuperblock();
 
     std::fstream newFile(fileName, std::fstream::in | std::fstream::out |std::fstream::binary);
@@ -90,8 +92,6 @@ void FileSystem::Upload(std::string &fileName) throw (std::string)
 
     uint32_t dataBegin = FindPlace(newFileSize);
 
-    std::cout << "dataBegin " << dataBegin << std::endl;
-
     int32_t index = -1;
 
     for(uint i = 0; i < FILES_NO; ++i)
@@ -105,7 +105,7 @@ void FileSystem::Upload(std::string &fileName) throw (std::string)
 
     files[index].name = fileName;
     files[index].size = newFileSize;
-    files[index].dataBegin = begin;
+    files[index].dataBegin = dataBegin;
 
     char temp[BLOCK_SIZE];
 
@@ -113,11 +113,7 @@ void FileSystem::Upload(std::string &fileName) throw (std::string)
 
     uint32_t blocksNo = BlocksNumber(newFileSize);
 
-    std::cout << "superb: " << SuperblockSize() << std::endl;
-
     partition.seekp(SuperblockSize() + BLOCK_SIZE*dataBegin, partition.beg);
-    std::streampos partitionIter = partition.tellp();
-    std::cout << "partIt: " << partitionIter << std::endl;
     newFile.seekg(0, newFile.beg);
 
     SemDown(ID, FILEACCESS);
@@ -133,12 +129,14 @@ void FileSystem::Upload(std::string &fileName) throw (std::string)
 
     WriteSuperblock();
 
+    SemUp(ID, FILEACCESS);
     std::cout << "The file has been added" << std::endl;
 }
 
 void FileSystem::Download(std::string &fileName) throw (std::string)
 {
     Exist();
+    SemDown(ID, FILEACCESS);
     ReadSuperblock();
 
     int32_t index = FindFile(fileName);
@@ -151,19 +149,19 @@ void FileSystem::Download(std::string &fileName) throw (std::string)
 
     partition.seekg(SuperblockSize() + BLOCK_SIZE*dataBegin, partition.beg);
 
-    SemDown(ID, FILEACCESS);
     partition.read(reinterpret_cast<char *>(temp), files[index].size*sizeof(char));
     file.write(reinterpret_cast<const char *>(temp), files[index].size*sizeof(char));
-    SemUp(ID, FILEACCESS);
 
     delete[] temp;
 
+    SemUp(ID, FILEACCESS);
     file.close();
 }
 
 void FileSystem::DeleteFile(std::string &fileName) throw (std::string)
 {
     Exist();
+    SemDown(ID, FILEACCESS);
     ReadSuperblock();
 
     int32_t index = FindFile(fileName);
@@ -179,13 +177,16 @@ void FileSystem::DeleteFile(std::string &fileName) throw (std::string)
 
     WriteSuperblock();
 
+
     sleep(1);
     std::cout << "File: " << fileName << " removed" << std::endl;
+    SemUp(ID, FILEACCESS);
 }
 
 void FileSystem::ListFiles() throw (std::string)
 {
     Exist();
+    SemDown(ID, FILEACCESS);
     ReadSuperblock();
 
     std::cout << "Name\t\t\tSize" << std::endl;
@@ -195,11 +196,13 @@ void FileSystem::ListFiles() throw (std::string)
         if(files[i].size != 0)
             std::cout << files[i].name << "\t" << files[i].size << std::endl;
     }
+    SemUp(ID, FILEACCESS);
 }
 
 void FileSystem::ListMemory() throw (std::string)
 {
     Exist();
+    SemDown(ID, FILEACCESS);
     ReadSuperblock();
 
     std::cout << "\n\tSUPERBLOCK:" << std::endl;
@@ -241,11 +244,13 @@ void FileSystem::ListMemory() throw (std::string)
         }
         std::cout << std::endl;
     }
+    SemUp(ID, FILEACCESS);
 }
 
 void FileSystem::ReadFile(std::string &fileName) throw (std::string)
 {
     Exist();
+    SemDown(ID, FILEACCESS);
 
     ReadSuperblock();
 
@@ -253,6 +258,7 @@ void FileSystem::ReadFile(std::string &fileName) throw (std::string)
 
     std::cout << "Reading the file: " << fileName << std::endl;
     sleep(1);
+    SemUp(ID, FILEACCESS);
 }
 
 void FileSystem::Exist() throw(std::string)
@@ -269,7 +275,6 @@ void FileSystem::NotExist() throw(std::string)
 
 void FileSystem::ReadSuperblock() throw (std::string)
 {
-    SemDown(ID, FILEACCESS);
     partition.seekg(0, partition.beg);
     partition.read(reinterpret_cast<char *>(&size), sizeof(uint32_t));
     partition.read(reinterpret_cast<char *>(&semId), sizeof(uint32_t));
@@ -293,13 +298,10 @@ void FileSystem::ReadSuperblock() throw (std::string)
 
     for(int i = 0; i < blocksNo; ++i)
         partition.read(reinterpret_cast<char *>(&bitmap[i]), sizeof(bool));
-
-    SemUp(ID, FILEACCESS);
 }
 
 void FileSystem::WriteSuperblock() throw (std::string)
 {
-    SemDown(ID, FILEACCESS);
     partition.seekp(0, partition.beg);
     partition.write(reinterpret_cast<const char *>(&size), sizeof(uint32_t));
     partition.write(reinterpret_cast<const char *>(&semId), sizeof(uint32_t));
@@ -321,19 +323,15 @@ void FileSystem::WriteSuperblock() throw (std::string)
     {
         partition.write(reinterpret_cast<const char *>(&bitmap[i]), sizeof(bool));
     }
-    SemUp(ID, FILEACCESS);
 }
 
 void FileSystem::WriteEmptyData()
 {
-    SemDown(ID, FILEACCESS);
     int blocksNo = size/BLOCK_SIZE;
 
     char temp[BLOCK_SIZE] = "";
     for(int i = 0; i < blocksNo; ++i)
         partition.write(reinterpret_cast<const char *>(&temp), sizeof(temp));
-
-    SemUp(ID, FILEACCESS);
 }
 
 uint32_t FileSystem::FindPlace(uint32_t fileSize) throw (std::string)
